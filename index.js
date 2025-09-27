@@ -1,80 +1,60 @@
 import express from "express";
-import bodyParser from "body-parser";
 
 const app = express();
-app.use(bodyParser.json());
+const port = process.env.PORT || 10000;
 
-let requests = []; // lưu tạm trong RAM
+// Middleware đọc JSON
+app.use(express.json());
 
-// Route test
-app.get("/", (req, res) => {
-  res.send("Server running 🚀");
-});
+// Bộ nhớ tạm để lưu yêu cầu
+const requests = [];
 
-// Nhận dữ liệu từ Google Form
+// Route nhận dữ liệu từ Google Form
 app.post("/update", (req, res) => {
-  const { data } = req.body;
-  const timestamp = new Date().toISOString();
+  const { timestamp, code, email } = req.body;
 
-  requests.push({ data, timestamp });
-  console.log("📩 New request:", data);
+  if (!code || !email) {
+    return res.status(400).json({ error: "Thiếu dữ liệu: code hoặc email" });
+  }
 
-  res.json({ status: "ok", received: data });
+  const newRequest = {
+    timestamp: timestamp || new Date().toISOString(),
+    code,
+    email
+  };
+
+  requests.push(newRequest);
+
+  console.log("📥 Nhận yêu cầu mới:", newRequest);
+
+  res.json({ message: "✅ Yêu cầu đã được ghi nhận", request: newRequest });
 });
 
-// Trang hiển thị danh sách yêu cầu
+// Route hiển thị danh sách yêu cầu
 app.get("/requests", (req, res) => {
-  let html = `
-    <html>
-    <head>
-      <title>Danh sách yêu cầu</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background: #f2f2f2; }
-        button { padding: 5px 10px; margin: 0 2px; cursor: pointer; }
-      </style>
-    </head>
-    <body>
-      <h1>📋 Danh sách yêu cầu cập nhật</h1>
-      <table>
-        <tr>
-          <th>Thời gian</th>
-          <th>Nội dung</th>
-          <th>Hành động</th>
-        </tr>
-        ${requests
-          .map(
-            (r, i) => `
-              <tr>
-                <td>${r.timestamp}</td>
-                <td>${r.data}</td>
-                <td>
-                  <button onclick="navigator.clipboard.writeText('${r.data}')">Copy</button>
-                  <button onclick="fetch('/delete/${i}', {method: 'POST'}).then(()=>location.reload())">Xóa</button>
-                </td>
-              </tr>
-            `
-          )
-          .join("")}
-      </table>
-    </body>
-    </html>
-  `;
+  let html = "<h2>Danh sách yêu cầu cập nhật</h2>";
+  if (requests.length === 0) {
+    html += "<p>Chưa có yêu cầu nào.</p>";
+  } else {
+    html += "<ul>";
+    for (const r of requests) {
+      html += `<li>
+        <b>Thời gian:</b> ${r.timestamp} <br>
+        <b>6 số:</b> ${r.code} <br>
+        <b>Email:</b> ${r.email}
+      </li><hr>`;
+    }
+    html += "</ul>";
+  }
   res.send(html);
 });
 
-// API xóa request
-app.post("/delete/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  if (!isNaN(id) && id >= 0 && id < requests.length) {
-    requests.splice(id, 1);
-  }
-  res.json({ status: "ok" });
+// Trang chính
+app.get("/", (req, res) => {
+  res.send("<h1>🚀 Xiaozhi Updater đang chạy!</h1><p>Đi đến <a href='/requests'>/requests</a> để xem yêu cầu.</p>");
 });
 
-// Render cần chạy port 10000
-app.listen(10000, () => {
-  console.log("✅ Server running on port 10000");
+// Khởi động server
+app.listen(port, () => {
+  console.log(`✅ Server running on port ${port}`);
 });
